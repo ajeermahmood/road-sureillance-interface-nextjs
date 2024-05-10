@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import io from "socket.io-client";
 
-export default async (req: NextApiRequest, res: NextApiResponse) => {
+const imageDetect = async (req: NextApiRequest, res: NextApiResponse) => {
   if (req.method === "POST") {
     try {
       const { base64Image } = req.body;
@@ -13,15 +13,25 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
       socket.emit("image", { base64Image });
 
       // Close the socket connection after sending the image
-      socket.close();
+      // socket.close();
 
-      res.status(200).json({ success: true });
+      return new Response(JSON.stringify({ message: "success" }), {
+        status: 200,
+      });
     } catch (error) {
       console.error(error);
-      res.status(500).json({ error: "Internal Server Error" });
+      return new Response(
+        JSON.stringify({ message: "Internal Server Error" }),
+        {
+          status: 500,
+        }
+      );
+      // res.status(500).json({ error: "Internal Server Error" });
     }
   } else {
     res.setHeader("Allow", ["POST"]);
-    res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+    // res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 };
+
+export { imageDetect as POST };

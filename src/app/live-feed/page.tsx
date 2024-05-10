@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import Webcam from "react-webcam";
+import { io } from "socket.io-client";
 
 const LiveFeed: React.FC = () => {
   var myStream: MediaStream | undefined;
@@ -30,20 +31,36 @@ const LiveFeed: React.FC = () => {
   const [image, setImage] = useState<string | null>(null);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      capture();
-    }, 5000); // Change 5000 to your desired interval in milliseconds
+    if (webcamPermission) {
+      const interval = setInterval(() => {
+        capture();
+      }, 5000); // Change 5000 to your desired interval in milliseconds
 
-    return () => clearInterval(interval);
-  }, []);
+      // Connect to the Python WebSocket server
+      const socket = io("http://localhost:5000");
+
+      // Listen for 'event' emitted from the server
+      socket.on("detected_objects", (data) => {
+        console.log("Received event:", data);
+        // Handle the received data as needed
+      });
+
+      // Cleanup function to disconnect the socket when the component unmounts
+      return () => {
+        socket.disconnect();
+        clearInterval(interval);
+      };
+    }
+  }, [webcamPermission]);
 
   const capture = async () => {
+    console.log("image capturing...");
     const imageSrc = webcamRef.current?.getScreenshot();
     if (imageSrc) {
       setImage(imageSrc);
       // Convert imageSrc to base64
       const base64Image = imageSrc.split(",")[1];
-      console.log(base64Image);
+      // console.log(base64Image);
 
       try {
         const response = await fetch("/api/image-detect", {
@@ -56,6 +73,10 @@ const LiveFeed: React.FC = () => {
 
         if (!response.ok) {
           throw new Error("Failed to send image data");
+        } else {
+          console.log("response ok...");
+          const json = await response.json();
+          console.log(json);
         }
       } catch (error) {
         console.error(error);

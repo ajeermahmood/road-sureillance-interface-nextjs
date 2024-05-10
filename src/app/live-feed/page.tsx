@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Webcam from "react-webcam";
 
 const LiveFeed: React.FC = () => {
@@ -26,6 +26,43 @@ const LiveFeed: React.FC = () => {
     }
   };
 
+  const webcamRef = useRef<Webcam>(null);
+  const [image, setImage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      capture();
+    }, 5000); // Change 5000 to your desired interval in milliseconds
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const capture = async () => {
+    const imageSrc = webcamRef.current?.getScreenshot();
+    if (imageSrc) {
+      setImage(imageSrc);
+      // Convert imageSrc to base64
+      const base64Image = imageSrc.split(",")[1];
+      console.log(base64Image);
+
+      try {
+        const response = await fetch("/api/image-detect", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ base64Image }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to send image data");
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  };
+
   return (
     <div>
       <h1 className="mb-10">Live feed</h1>
@@ -42,7 +79,21 @@ const LiveFeed: React.FC = () => {
         Revoke Webcam
       </button>
 
-      <div className="mt-10">{webcamPermission ? <Webcam /> : <></>}</div>
+      <div className="mt-10">
+        {webcamPermission ? (
+          <>
+            <Webcam
+              audio={false}
+              ref={webcamRef}
+              screenshotFormat="image/jpeg"
+              width={640}
+              height={480}
+            />
+          </>
+        ) : (
+          <></>
+        )}
+      </div>
     </div>
   );
 };

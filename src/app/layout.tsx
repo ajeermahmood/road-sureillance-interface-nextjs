@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import SidebarComponent from "@/components/sidebar";
+import LayoutMiddleware from "./layout-middleware";
+import SessionProvider from "./sessionProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -18,12 +19,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <div className="flex flex-row min-h-screen">
-          <div className="flex flex-col min-w-80">
-            <SidebarComponent />
-          </div>
-          <div className="flex flex-col w-full min-h-screen">{children}</div>
-        </div>
+        <SessionProvider>
+          <LayoutMiddleware children={children} />
+        </SessionProvider>
       </body>
     </html>
   );

@@ -44,8 +44,8 @@ const LiveFeed: React.FC = () => {
     socket.on("detected_objects", (data) => {
       // console.log("Received event:", data);
       setInervalBtw((prev) => prev + 1);
-      // console.log(data.items) 
-      for (let i of data.items) { 
+      console.log(data);
+      for (let i of data.items) {
         dispatch(incrementCount(i));
       }
     });
@@ -125,7 +125,7 @@ const LiveFeed: React.FC = () => {
             <Webcam
               audio={false}
               ref={webcamRef}
-              screenshotFormat="image/jpeg"
+              screenshotFormat="image/webp"
               width={160}
               height={120}
             />

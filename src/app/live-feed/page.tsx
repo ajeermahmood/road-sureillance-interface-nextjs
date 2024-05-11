@@ -1,92 +1,111 @@
 "use client";
+import { incrementCount } from "@/redux/objectDetectionSlice";
+import { socket } from "@/socket";
 import React, { useEffect, useRef, useState } from "react";
+import { useDispatch } from "react-redux";
 import Webcam from "react-webcam";
-import { io } from "socket.io-client";
 
 const LiveFeed: React.FC = () => {
-  var myStream: MediaStream | undefined;
+  ///////////// Redux //////////////////
+  const dispatch = useDispatch();
 
+  ///////////// Redux //////////////////
+
+  const [isConnected, setIsConnected] = useState(false);
+  const [transport, setTransport] = useState("N/A");
+
+  const [intervalBtwScreenshot, setInervalBtw] = useState(0);
+
+  const webcamRef = useRef<Webcam>(null);
   const [webcamPermission, setWebcamPermission] = useState(false);
+
+  useEffect(() => {
+    if (socket.connected) {
+      onConnect();
+    }
+
+    function onConnect() {
+      setIsConnected(true);
+      setTransport(socket.io.engine.transport.name);
+
+      socket.io.engine.on("upgrade", (transport) => {
+        setTransport(transport.name);
+      });
+    }
+
+    function onDisconnect() {
+      setIsConnected(false);
+      setTransport("N/A");
+    }
+
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+
+    socket.on("detected_objects", (data) => {
+      // console.log("Received event:", data);
+      setInervalBtw((prev) => prev + 1);
+      // console.log(data.items) 
+      for (let i of data.items) { 
+        dispatch(incrementCount(i));
+      }
+    });
+
+    return () => {
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+    };
+  }, []);
 
   const toggleWebcam = (toggle: boolean) => {
     if (toggle) {
       navigator.mediaDevices
         .getUserMedia({ video: true, audio: true })
         .then((stream) => {
-          console.log("received accesss");
-          myStream = stream;
+          console.log("received accesss.");
           setWebcamPermission(true);
         })
         .catch((err) => console.log(err));
     } else {
-      if (myStream != undefined) {
-        myStream!.getVideoTracks()[0].stop();
-        console.log("accesss revoked");
-        setWebcamPermission(false);
-      }
+      navigator.mediaDevices
+        .getUserMedia({ video: true, audio: true })
+        .then((stream) => {
+          stream!.getVideoTracks()[0].stop();
+          stream!.getAudioTracks()[0].stop();
+          console.log("accesss revoked.");
+          setWebcamPermission(false);
+        })
+        .catch((err) => console.log(err));
     }
   };
 
-  const webcamRef = useRef<Webcam>(null);
-  const [image, setImage] = useState<string | null>(null);
-
   useEffect(() => {
     if (webcamPermission) {
-      const interval = setInterval(() => {
+      setTimeout(() => {
         capture();
-      }, 5000); // Change 5000 to your desired interval in milliseconds
-
-      // Connect to the Python WebSocket server
-      const socket = io("http://localhost:5000");
-
-      // Listen for 'event' emitted from the server
-      socket.on("detected_objects", (data) => {
-        console.log("Received event:", data);
-        // Handle the received data as needed
-      });
-
-      // Cleanup function to disconnect the socket when the component unmounts
-      return () => {
-        socket.disconnect();
-        clearInterval(interval);
-      };
+      }, 5000);
     }
-  }, [webcamPermission]);
+  }, [webcamPermission, intervalBtwScreenshot]);
 
   const capture = async () => {
     console.log("image capturing...");
     const imageSrc = webcamRef.current?.getScreenshot();
     if (imageSrc) {
-      setImage(imageSrc);
       // Convert imageSrc to base64
       const base64Image = imageSrc.split(",")[1];
-      // console.log(base64Image);
-
-      try {
-        const response = await fetch("/api/image-detect", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ base64Image }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to send image data");
-        } else {
-          console.log("response ok...");
-          const json = await response.json();
-          console.log(json);
-        }
-      } catch (error) {
-        console.error(error);
-      }
+      socket.emit("image", { img: base64Image });
+    } else {
+      console.log("screenshot not recieved..");
     }
   };
 
   return (
     <div>
       <h1 className="mb-10">Live feed</h1>
+      <p>
+        Websocket Status: {isConnected ? "connected" : "disconnected"} ,
+        Transport: {transport}
+      </p>
+      <p>Cam Status: {webcamPermission ? "ON" : "OFF"}</p>
       <button
         onClick={() => toggleWebcam(true)}
         className="mr-5 bg-transparent hover:bg-blue-500 text-blue-700 font-semibold hover:text-white py-2 px-4 border border-blue-500 hover:border-transparent rounded"
@@ -107,8 +126,8 @@ const LiveFeed: React.FC = () => {
               audio={false}
               ref={webcamRef}
               screenshotFormat="image/jpeg"
-              width={640}
-              height={480}
+              width={160}
+              height={120}
             />
           </>
         ) : (
